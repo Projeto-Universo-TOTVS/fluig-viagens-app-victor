@@ -34,36 +34,34 @@ permissions:
 
 jobs:
 
-##Job de testes
+  ##Job de testes
 
-test:
-  runs-on: ubuntu-latest
-  container:
-    image: node:22-bookworm-slim
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm-slim
 
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
-    - name: Rodar testes
-      run: npm test
+      - name: Rodar testes
+        run: npm test
 
-##Fim Job de Testes
+  ##Fim Job de Testes
 
 
-##Job de Deploy
+  ##Job de Deploy
 
-deploy:
-  needs: test
-  runs-on: ubuntu-latest
-  if: >
-    needs.test.result == 'success' &&
-    (
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    )
-
-##Fim Job de Deploy
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: >
+      needs.test.result == 'success' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
 
     steps:
       - name: Checkout
@@ -71,7 +69,7 @@ deploy:
         with:
           fetch-depth: 0
 
-##Step descobrindo dataset que foram alterados
+      ##Step descobrindo dataset que foram alterados
 
       - name: Descobrir datasets alterados
         id: datasets
@@ -100,7 +98,7 @@ deploy:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-##Fim Step descobrindo dataset que foram alterados
+      ##Fim Step descobrindo dataset que foram alterados
 
       - name: Encerrar sem deploy
         if: steps.datasets.outputs.paths == ''
@@ -115,7 +113,7 @@ deploy:
         if: steps.datasets.outputs.paths != ''
         run: docker pull ghcr.io/cardevisi/fluig-cli:0.1.0
 
-##Deploy dos datasets alterados
+      ##Deploy dos datasets alterados
 
       - name: Deploy dos datasets alterados
         if: steps.datasets.outputs.paths != ''
@@ -138,4 +136,6 @@ deploy:
             -e GITHUB_RUN_ID \
             ghcr.io/cardevisi/fluig-cli:0.1.0
 
-##Fim Deploy dos datasets alterados
+      ##Fim Deploy dos datasets alterados
+
+  ##Fim Job de Deploy
