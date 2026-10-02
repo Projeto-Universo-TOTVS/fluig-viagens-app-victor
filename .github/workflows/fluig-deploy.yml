@@ -36,14 +36,32 @@ jobs:
 
 ##Job de testes
 
-## Cole o trecho de código aqui
+test:
+  runs-on: ubuntu-latest
+  container:
+    image: node:22-bookworm-slim
+
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Rodar testes
+      run: npm test
 
 ##Fim Job de Testes
 
 
 ##Job de Deploy
 
-## Cole o trecho de código aqui
+deploy:
+  needs: test
+  runs-on: ubuntu-latest
+  if: >
+    needs.test.result == 'success' &&
+    (
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    )
 
 ##Fim Job de Deploy
 
@@ -55,7 +73,32 @@ jobs:
 
 ##Step descobrindo dataset que foram alterados
 
-## Cole o trecho de código aqui
+      - name: Descobrir datasets alterados
+        id: datasets
+        shell: bash
+        run: |
+          # Quando o disparo for manual (`workflow_dispatch`),
+          # usamos exatamente a lista informada no input `dataset_paths`.
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            DATASETS="${{ github.event.inputs.dataset_paths }}"
+          else
+            # Quando o disparo vier de um `push`,
+            # calculamos os datasets alterados comparando o commit anterior com o atual.
+            BASE="${{ github.event.before }}"
+            if [[ -z "$BASE" || "$BASE" == "0000000000000000000000000000000000000000" ]]; then
+              BASE="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            fi
+            DATASETS="$(git diff --name-only "$BASE" "${GITHUB_SHA}" | grep '^datasets/.*\.js$' || true)"
+          fi
+
+          echo "Selecionados:"
+          printf '%s\n' "$DATASETS"
+
+          {
+            echo "paths<<EOF"
+            printf '%s\n' "$DATASETS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
 ##Fim Step descobrindo dataset que foram alterados
 
@@ -74,6 +117,25 @@ jobs:
 
 ##Deploy dos datasets alterados
 
-## Cole o trecho de código aqui
+      - name: Deploy dos datasets alterados
+        if: steps.datasets.outputs.paths != ''
+        env:
+          FLUIG_BASE_URL: ${{ secrets.FLUIG_BASE_URL }}
+          FLUIG_USERNAME: ${{ secrets.FLUIG_USERNAME }}
+          FLUIG_PASSWORD: ${{ secrets.FLUIG_PASSWORD }}
+          FLUIG_SERVER_NAME: ${{ vars.FLUIG_SERVER_NAME }}
+          FLUIG_DATASET_PATHS: ${{ steps.datasets.outputs.paths }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            -e FLUIG_BASE_URL \
+            -e FLUIG_USERNAME \
+            -e FLUIG_PASSWORD \
+            -e FLUIG_SERVER_NAME \
+            -e FLUIG_DATASET_PATHS \
+            -e GITHUB_RUN_ID \
+            ghcr.io/cardevisi/fluig-cli:0.1.0
 
 ##Fim Deploy dos datasets alterados
